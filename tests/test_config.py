@@ -1,6 +1,7 @@
 # tests/test_config.py
 import os
 import importlib
+import pytest
 from alpaca_training import config
 
 
@@ -50,9 +51,21 @@ class TestConfig:
         assert "API_KEY" in cfg
         assert "API_SECRET" in cfg
         assert "PAPER" in cfg
+        assert cfg["API_KEY"] == config.ALPACA_API_KEY
+        assert cfg["API_SECRET"] == config.ALPACA_API_SECRET
+        assert cfg["PAPER"] == (config.ALPACA_MODE == "paper")
 
     def test_risk_params_returns_dict(self):
         params = config.get_risk_params()
         assert "max_position_size_pct" in params
         assert "max_concurrent_positions" in params
         assert "daily_stop_loss_pct" in params
+        assert params["max_position_size_pct"] == config.MAX_POSITION_SIZE_PCT
+        assert params["max_concurrent_positions"] == config.MAX_CONCURRENT_POSITIONS
+        assert params["daily_stop_loss_pct"] == config.DAILY_STOP_LOSS_PCT
+
+    def test_invalid_alpaca_mode_raises_error(self, monkeypatch):
+        monkeypatch.setenv("ALPACA_MODE", "invalid")
+        reloaded = importlib.reload(config)
+        with pytest.raises(ValueError, match="ALPACA_MODE must be 'paper' or 'live'"):
+            reloaded.get_alpaca_config()

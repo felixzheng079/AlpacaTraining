@@ -14,10 +14,12 @@ DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "..", "al
 
 
 def get_alpaca_config():
+    if ALPACA_MODE not in ("paper", "live"):
+        raise ValueError(f"ALPACA_MODE must be 'paper' or 'live', got '{ALPACA_MODE}'")
     return {
         "API_KEY": ALPACA_API_KEY,
         "API_SECRET": ALPACA_API_SECRET,
-        "PAPER": ALPACA_MODE != "live",
+        "PAPER": ALPACA_MODE == "paper",
     }
 
 
