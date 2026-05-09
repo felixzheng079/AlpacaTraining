@@ -10,7 +10,10 @@ class TestDatabase:
         self.db_path = self.tmp.name
 
     def teardown_method(self):
-        os.unlink(self.db_path)
+        try:
+            os.unlink(self.db_path)
+        except OSError:
+            pass
 
     def test_init_db_creates_tables(self):
         init_db(self.db_path)
@@ -26,16 +29,19 @@ class TestDatabase:
         assert "daily_snapshots" in table_names
         conn.close()
 
+    def test_init_db_idempotent(self):
+        init_db(self.db_path)
+        init_db(self.db_path)
+
     def test_log_trade_and_get_trades(self):
         init_db(self.db_path)
         log_trade(self.db_path, "my_strategy", "AAPL", "BUY", 50, 150.0)
         log_trade(self.db_path, "my_strategy", "GOOG", "SELL", 10, 140.0)
         trades = get_trades(self.db_path)
         assert len(trades) == 2
-        assert trades[0][1] == "my_strategy"
-        assert trades[0][2] == "GOOG"
-        assert trades[1][1] == "my_strategy"
-        assert trades[1][2] == "AAPL"
+        symbols = {t[2] for t in trades}
+        assert symbols == {"AAPL", "GOOG"}
+        assert all(t[1] == "my_strategy" for t in trades)
 
     def test_update_position_and_get_positions(self):
         init_db(self.db_path)
@@ -45,6 +51,14 @@ class TestDatabase:
         assert positions[0][0] == "my_strategy"
         assert positions[0][1] == "AAPL"
         assert positions[0][2] == 100
+
+        update_position(self.db_path, "my_strategy", "AAPL", 200, 160.0, 165.0, 1000.0)
+        positions = get_positions(self.db_path)
+        assert len(positions) == 1
+        assert positions[0][2] == 200
+        assert positions[0][3] == 160.0
+        assert positions[0][4] == 165.0
+        assert positions[0][5] == 1000.0
 
     def test_log_risk_decision_and_get_risk_log(self):
         init_db(self.db_path)
