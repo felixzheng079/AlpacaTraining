@@ -73,3 +73,25 @@ class TestRiskManager:
         rm.update_position("AAPL", 100, 150.0)
         assert rm._positions["AAPL"]["quantity"] == 100
         assert rm._positions["AAPL"]["entry_price"] == 150.0
+
+    def test_check_allows_sell_when_stop_loss_hit(self):
+        rm = RiskManager(daily_stop_loss_pct=-0.05)
+        rm.update_pnl(-6000.0)
+        rm.update_position("AAPL", 100, 150.0)
+        qty = rm.check(portfolio_value=100000.0, symbol="AAPL", price=150.0, direction="SELL")
+        assert qty > 0
+
+    def test_can_trade_false_when_portfolio_zero(self):
+        rm = RiskManager()
+        assert rm.can_trade(0.0) is False
+
+    def test_can_trade_false_when_portfolio_negative(self):
+        rm = RiskManager()
+        assert rm.can_trade(-1000.0) is False
+
+    def test_update_position_accumulates_existing(self):
+        rm = RiskManager()
+        rm.update_position("AAPL", 100, 150.0)
+        rm.update_position("AAPL", 50, 180.0)
+        assert rm._positions["AAPL"]["quantity"] == 150
+        assert rm._positions["AAPL"]["entry_price"] == 160.0

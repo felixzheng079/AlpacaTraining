@@ -24,7 +24,7 @@ class RiskManager:
         return int(max_investment / price)
 
     def check(self, portfolio_value: float, symbol: str, price: float, direction: str) -> int:
-        if not self.can_trade(portfolio_value):
+        if direction == "BUY" and not self.can_trade(portfolio_value):
             return 0
 
         qty = self.calculate_quantity(portfolio_value, price)
@@ -39,7 +39,18 @@ class RiskManager:
         return qty
 
     def update_position(self, symbol: str, quantity: int, price: float):
-        self._positions[symbol] = {"quantity": quantity, "entry_price": price}
+        if symbol in self._positions:
+            old = self._positions[symbol]
+            old_qty = old["quantity"]
+            old_price = old["entry_price"]
+            new_qty = old_qty + quantity
+            if new_qty == 0:
+                new_entry = 0.0
+            else:
+                new_entry = (old_qty * old_price + quantity * price) / new_qty
+            self._positions[symbol] = {"quantity": new_qty, "entry_price": new_entry}
+        else:
+            self._positions[symbol] = {"quantity": quantity, "entry_price": price}
 
     def update_pnl(self, amount: float):
         self._daily_pnl += amount
