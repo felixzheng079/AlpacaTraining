@@ -1,5 +1,8 @@
 from lumibot.strategies.strategy import Strategy
 
+from alpaca_training.config import DB_PATH
+from alpaca_training.db import log_trade, update_position, log_risk_decision
+
 
 class SMACrossover(Strategy):
     parameters = {
@@ -30,11 +33,35 @@ class SMACrossover(Strategy):
         price = self.get_last_price(symbol)
 
         if short_sma > long_sma and position_qty == 0:
-            qty = self.parameters.get("risk_manager").check(
-                self.portfolio_value, symbol, price, "BUY"
-            ) if self.parameters.get("risk_manager") else 10
+            risk_mgr = self.parameters.get("risk_manager")
+            if risk_mgr:
+                qty = risk_mgr.check(self.portfolio_value, symbol, price, "BUY")
+            else:
+                qty = 10
+
             if qty > 0:
-                self.buy(symbol, qty)
+                order = self.create_order(symbol, qty, "buy")
+                self.submit_order(order)
+                log_trade(DB_PATH, self.__class__.__name__, symbol, "BUY", qty, price)
+                update_position(
+                    DB_PATH, self.__class__.__name__, symbol, qty, price, price, 0.0
+                )
+            elif risk_mgr:
+                log_risk_decision(
+                    DB_PATH, self.__class__.__name__, "buy_rejected", "risk_manager"
+                )
 
         elif short_sma < long_sma and position_qty > 0:
             self.sell_all()
+            log_trade(DB_PATH, self.__class__.__name__, symbol, "SELL", position_qty, price)
+            update_position(DB_PATH, self.__class__.__name__, symbol, 0, 0.0, 0.0, 0.0)
+
+    def on_filled_order(self, position, order, price, quantity, multiplier):
+        symbol = order.symbol if order else position.asset
+        strategy_name = self.__class__.__name__
+        pnl = position.unrealized_profit_loss if position and hasattr(position, 'unrealized_profit_loss') else 0.0
+        qty = int(position.quantity) if position else quantity
+        avg_price = position.avg_fill_price if position and hasattr(position, 'avg_fill_price') else price
+        update_position(
+            DB_PATH, strategy_name, symbol, qty, avg_price, price, pnl
+        )
