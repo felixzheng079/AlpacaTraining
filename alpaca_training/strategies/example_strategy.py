@@ -13,18 +13,24 @@ class SMACrossover(Strategy):
         "symbol": "SPY",
         "short_window": 10,
         "long_window": 30,
+        "timestep": "day",
     }
 
     def initialize(self):
-        self.sleeptime = "1H"
+        ts = self.parameters["timestep"]
+        if ts == "hour":
+            self.sleeptime = "1H"
+        else:
+            self.sleeptime = "1D"
         self.vars.signal = None
 
     def on_trading_iteration(self):
         symbol = self.parameters["symbol"]
         short_w = self.parameters["short_window"]
         long_w = self.parameters["long_window"]
+        ts = self.parameters["timestep"]
 
-        bars = self.get_historical_prices(symbol, length=long_w + 1, timestep="hour")
+        bars = self.get_historical_prices(symbol, length=long_w + 1, timestep=ts)
         if bars is None or len(bars.df) < long_w + 1:
             return
 

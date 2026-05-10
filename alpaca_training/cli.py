@@ -74,7 +74,7 @@ def run(strategy_name, live, from_date, to_date):
             YahooDataBacktesting,
             datetime.fromisoformat(from_date),
             datetime.fromisoformat(to_date),
-            parameters={"symbol": "SPY"},
+            parameters={"symbol": "SPY", "timestep": "day"},
         )
         return
 
@@ -101,6 +101,7 @@ def run(strategy_name, live, from_date, to_date):
         parameters={
             "risk_manager": risk_manager,
             "symbol": "SPY",
+            "timestep": "hour",
         },
     )
 
@@ -133,7 +134,7 @@ def backtest(strategy_name, from_date, to_date):
         YahooDataBacktesting,
         datetime.fromisoformat(from_date),
         datetime.fromisoformat(to_date),
-        parameters={"symbol": "SPY"},
+        parameters={"symbol": "SPY", "timestep": "day"},
     )
 
 

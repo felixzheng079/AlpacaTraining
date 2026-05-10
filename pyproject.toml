@@ -23,3 +23,8 @@ dev = [
 
 [project.scripts]
 alpaca-training = "alpaca_training.cli:cli"
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests that require network access (backtesting, live data)",
+]
