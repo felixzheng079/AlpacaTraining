@@ -1,9 +1,8 @@
+import logging
 import subprocess
 import sys
 
 import click
-from lumibot.brokers import Alpaca
-from lumibot.traders import Trader
 
 from alpaca_training import config
 from alpaca_training.config import (
@@ -18,6 +17,12 @@ from alpaca_training.strategies import discover_strategies
 
 @click.group()
 def cli():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    logging.getLogger("lumibot").setLevel(logging.WARNING)
     init_db(config.DB_PATH)
 
 
@@ -34,17 +39,57 @@ def list():
 
 @cli.command()
 @click.argument("strategy_name")
-def run(strategy_name):
+@click.option("--live", is_flag=True, help="Force live trading even when market is closed.")
+@click.option("--from", "from_date", default=None, help="Backtest start date when market is closed (YYYY-MM-DD).")
+@click.option("--to", "to_date", default=None, help="Backtest end date when market is closed (YYYY-MM-DD).")
+def run(strategy_name, live, from_date, to_date):
+    from datetime import datetime, time, timedelta
+    from zoneinfo import ZoneInfo
+    from lumibot.backtesting import YahooDataBacktesting
+
     strategies = discover_strategies()
     match = next((s for s in strategies if s["name"] == strategy_name), None)
     if match is None:
         click.echo(f"Strategy '{strategy_name}' not found. Run 'list' to see available strategies.")
         raise SystemExit(1)
 
+    now_et = datetime.now(ZoneInfo("US/Eastern"))
+    market_open = now_et.weekday() < 5 and time(9, 30) <= now_et.time() <= time(16, 0)
+    is_weekend = now_et.weekday() >= 5
+
+    if not live and not market_open:
+        if not from_date:
+            from_dt = datetime.now() - timedelta(days=90)
+            from_date = from_dt.strftime("%Y-%m-%d")
+        if not to_date:
+            to_date = now_et.strftime("%Y-%m-%d")
+
+        reason = "weekend" if is_weekend else "outside market hours"
+        click.echo(f"Market is closed ({reason}). Running backtest instead.")
+        click.echo(f"Backtesting '{strategy_name}' from {from_date} to {to_date}...")
+        click.echo("Use --live to force live trading. Use --from/--to to change date range.\n")
+
+        strategy_cls = match["cls"]
+        strategy_cls.backtest(
+            YahooDataBacktesting,
+            datetime.fromisoformat(from_date),
+            datetime.fromisoformat(to_date),
+            parameters={"symbol": "SPY"},
+        )
+        return
+
+    if not live:
+        if is_weekend:
+            click.echo("Market is closed (weekend). Use --live to force, or remove --live for backtest.")
+            raise SystemExit(1)
+
     alpaca_config = get_alpaca_config()
     if not alpaca_config["API_KEY"] or not alpaca_config["API_SECRET"]:
         click.echo("ALPACA_API_KEY and ALPACA_API_SECRET must be set in environment.")
         raise SystemExit(1)
+
+    from lumibot.brokers import Alpaca
+    from lumibot.traders import Trader
 
     broker = Alpaca(alpaca_config)
     risk_params = get_risk_params()
@@ -61,7 +106,10 @@ def run(strategy_name):
 
     trader = Trader()
     trader.add_strategy(strategy)
-    click.echo(f"Running strategy '{strategy_name}' in {alpaca_config['PAPER'] and 'paper' or 'live'} mode...")
+    mode = "paper" if alpaca_config["PAPER"] else "live"
+    click.echo(f"Running '{strategy_name}' in {mode} mode (1H bars).")
+    click.echo("Strategy triggers on hourly bar close during market hours (9:30-16:00 ET).")
+    click.echo("Use Ctrl+C to stop.\n")
     trader.run_all()
 
 
@@ -135,3 +183,7 @@ def dashboard():
     subprocess.run(
         [sys.executable, "-m", "uvicorn", "alpaca_training.dashboard.server:app", "--host", "0.0.0.0", "--port", str(DASHBOARD_PORT)]
     )
+
+
+if __name__ == "__main__":
+    cli()

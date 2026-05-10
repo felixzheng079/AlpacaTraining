@@ -17,25 +17,30 @@ export ALPACA_API_SECRET="your-paper-secret"
 
 ## Usage
 
+All commands use `python -m alpaca_training.cli`:
+
 ```bash
 # List available strategies
-alpaca-training list
+python -m alpaca_training.cli list
 
-# Run a strategy in paper trading mode
-alpaca-training run SMACrossover
+# Backtest a strategy (works offline, no API keys needed)
+python -m alpaca_training.cli backtest SMACrossover --from 2024-01-01 --to 2024-12-31
 
-# Backtest a strategy
-alpaca-training backtest SMACrossover --from 2024-01-01 --to 2024-12-31
-
-# Pause or resume a running strategy
-alpaca-training pause SMACrossover
-alpaca-training resume SMACrossover
+# Run a strategy in paper trading mode (requires market hours, 9:30-16:00 ET)
+python -m alpaca_training.cli run SMACrossover
 
 # Check status
-alpaca-training status
+python -m alpaca_training.cli status
 
 # Start web dashboard
-alpaca-training dashboard
+python -m alpaca_training.cli dashboard
+```
+
+Alternatively, set up a shell alias:
+```bash
+alias at="python -m alpaca_training.cli"
+at list
+at backtest SMACrossover --from 2024-01-01 --to 2024-12-31
 ```
 
 ## Configuration
