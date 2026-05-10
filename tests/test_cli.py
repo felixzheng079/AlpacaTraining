@@ -7,7 +7,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(cli, ["list"])
         assert result.exit_code == 0
-        assert "SMACrossover" in result.output
+        assert "Available strategies:" in result.output
 
     def test_status_command(self, monkeypatch, tmp_path):
         db_path = str(tmp_path / "test.db")
@@ -19,6 +19,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(cli, ["status"])
         assert result.exit_code == 0
+        assert "$150.00" in result.output
 
     def test_list_has_no_errors(self):
         runner = CliRunner()
