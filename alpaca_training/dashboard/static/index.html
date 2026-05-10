@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpaca Training - Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117; color: #c9d1d9; padding: 20px;
+        }
+        h1 { font-size: 24px; margin-bottom: 20px; color: #58a6ff; }
+        h2 { font-size: 18px; margin: 16px 0 8px; color: #8b949e; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 16px; }
+        .card {
+            background: #161b22; border: 1px solid #30363d;
+            border-radius: 6px; padding: 16px;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #21262d; }
+        th { color: #8b949e; font-weight: 600; }
+        .positive { color: #3fb950; }
+        .negative { color: #f85149; }
+        .muted { color: #8b949e; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>Alpaca Training Dashboard</h1>
+    <div class="grid">
+        <div class="card">
+            <h2>Open Positions</h2>
+            <table id="positions-table">
+                <thead><tr><th>Strategy</th><th>Symbol</th><th>Qty</th><th>Avg Price</th><th>P&L</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <p id="no-positions" class="muted">No open positions.</p>
+        </div>
+        <div class="card">
+            <h2>Daily P&L</h2>
+            <table id="pnl-table">
+                <thead><tr><th>Date</th><th>P&L</th><th>Trades</th><th>Strategies</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="card">
+            <h2>Recent Trades</h2>
+            <table id="trades-table">
+                <thead><tr><th>Time</th><th>Strategy</th><th>Side</th><th>Symbol</th><th>Qty</th><th>Price</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <p id="no-trades" class="muted">No recent trades.</p>
+        </div>
+        <div class="card">
+            <h2>Active Strategies</h2>
+            <table id="strategies-table">
+                <thead><tr><th>Name</th><th>Module</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function fetchJSON(url) {
+            try {
+                const res = await fetch(url);
+                return await res.json();
+            } catch { return []; }
+        }
+
+        function formatPnl(value) {
+            const cls = value >= 0 ? 'positive' : 'negative';
+            const sign = value >= 0 ? '+' : '';
+            return `<span class="${cls}">${sign}$${value.toFixed(2)}</span>`;
+        }
+
+        async function refresh() {
+            const [positions, pnl, trades, strategies] = await Promise.all([
+                fetchJSON('/api/positions'),
+                fetchJSON('/api/pnl'),
+                fetchJSON('/api/trades'),
+                fetchJSON('/api/strategies'),
+            ]);
+
+            let html = '';
+            if (positions.length === 0) {
+                document.getElementById('no-positions').style.display = 'block';
+            } else {
+                document.getElementById('no-positions').style.display = 'none';
+                for (const p of positions) {
+                    html += `<tr>
+                        <td>${p.strategy}</td><td>${p.symbol}</td><td>${p.quantity}</td>
+                        <td>$${p.avg_price.toFixed(2)}</td><td>${formatPnl(p.pnl)}</td>
+                    </tr>`;
+                }
+            }
+            document.querySelector('#positions-table tbody').innerHTML = html;
+
+            html = '';
+            for (const s of pnl) {
+                html += `<tr>
+                    <td>${s.date}</td><td>${formatPnl(s.total_pnl)}</td>
+                    <td>${s.num_trades}</td><td>${s.strategies_active}</td>
+                </tr>`;
+            }
+            document.querySelector('#pnl-table tbody').innerHTML = html;
+
+            html = '';
+            if (trades.length === 0) {
+                document.getElementById('no-trades').style.display = 'block';
+            } else {
+                document.getElementById('no-trades').style.display = 'none';
+                for (const t of trades) {
+                    const sideCls = t.side === 'BUY' ? 'positive' : 'negative';
+                    html += `<tr>
+                        <td>${t.timestamp}</td><td>${t.strategy}</td>
+                        <td class="${sideCls}">${t.side}</td><td>${t.symbol}</td>
+                        <td>${t.quantity}</td><td>$${t.price.toFixed(2)}</td>
+                    </tr>`;
+                }
+            }
+            document.querySelector('#trades-table tbody').innerHTML = html;
+
+            html = '';
+            for (const s of strategies) {
+                html += `<tr><td>${s.name}</td><td>${s.module}</td></tr>`;
+            }
+            document.querySelector('#strategies-table tbody').innerHTML = html;
+        }
+
+        refresh();
+        setInterval(refresh, 5000);
+    </script>
+</body>
+</html>
